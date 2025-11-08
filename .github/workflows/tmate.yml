@@ -1,4 +1,4 @@
-name: Create VPS (Auto Restart)
+name: Create Vps
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     types: [create-vps]
 
 env:
-  VPS_NAME: vps-project-1762601674166
+  VPS_NAME: vps-project-thien
   TMATE_SERVER: nyc1.tmate.io
   GITHUB_TOKEN_VPS: ${{ secrets.GH_TOKEN }}
   NGROK_SERVER_URL: https://vps-github.vercel.app
@@ -24,23 +24,92 @@ jobs:
       with:
         token: ${{ secrets.GH_TOKEN }}
 
+    - name: 🕒 Set Timezone to Vietnam (UTC+7)
+      run: tzutil /s "SE Asia Standard Time"
+
     - name: 🐍 Tạo file VPS info
       run: |
         mkdir -Force links
-        "VPS khởi tạo - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath "links/vps-project-1762601674166.txt" -Encoding UTF8
+        "VPS khởi tạo - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Out-File -FilePath "links/vps-project-1759814306940.txt" -Encoding UTF8
 
-    - name: 🖥️ Cài đặt và chạy TightVNC, noVNC, Cloudflared
+    # --- BƯỚC 1: CÀI ĐẶT ỨNG DỤNG VÀ TÙY CHỈNH ---
+    - name: 💻 Cài đặt ứng dụng và tùy chỉnh
       shell: pwsh
       run: |
-        Write-Host "📥 Installing TightVNC, noVNC, and Cloudflared..."
+        Write-Host "⚙️ Installing custom applications via Chocolatey..."
+        Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         
+        Write-Host "📥 Installing TeamViewer..."
+        choco install teamviewer -y
+        
+        Write-Host "📥 Installing Visual Studio Code..."
+        choco install vscode -y
+
+        Write-Host "📥 Installing Unikey..."
+        choco install unikey -y
+
+        Write-Host "📥 Installing Google Drive for Desktop..."
+        choco install google-drive-for-desktop -y
+
+        Write-Host "📥 Installing Google Photos (Backup and Sync)..."
+        choco install google-backup-and-sync -y
+
+        Write-Host "📥 Installing OBS Studio..."
+        choco install obs-studio -y
+
+        Write-Host "✅ All custom applications installed."
+
+        # --- THÊM MỚI: CÀI CARD ẢO VÀ BẬT DỊCH VỤ ÂM THANH ---
+        Write-Host "🔊 Installing VB-CABLE (Virtual Audio Driver)..."
+        choco install vb-cable -y
+
+        Write-Host "🔊 Forcing Windows Audio Service to start..."
+        try {
+            Set-Service -Name "Audiosrv" -StartupType Automatic
+            Start-Service -Name "Audiosrv"
+            Write-Host "✅ Windows Audio Service (Audiosrv) started."
+        } catch {
+            Write-Host "⚠️ Failed to start Windows Audio Service: $_"
+        }
+        # --- KẾT THÚC PHẦN ÂM THANH ---
+
+        Write-Host "🎨 Setting custom wallpaper..."
+        $imageUrl = "https://i.postimg.cc/y8Bh4JS0/hutao.jpg"
+        $imagePath = "C:\wallpaper.jpg"
+        
+        try {
+            # Tải ảnh về
+            Invoke-WebRequest -Uri $imageUrl -OutFile $imagePath
+            
+            # Kích hoạt dịch vụ Themes (cần thiết cho Windows Server)
+            Set-Service -Name "Themes" -StartupType Automatic
+            Start-Service -Name "Themes" -ErrorAction SilentlyContinue
+            
+            # Đặt hình nền trong Registry
+            Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name Wallpaper -Value $imagePath
+            
+            # Ép hệ thống làm mới hình nền
+            RUNDLL32.EXE user32.dll,UpdatePerUserSystemParameters 1, True
+            
+            Write-Host "✅ Wallpaper set successfully."
+        } catch {
+            Write-Host "⚠️ Failed to download or set wallpaper: $_"
+        }
+        
+        Write-Host "✅ All setup tasks complete."
+
+
+    # --- BƯỚC 2: CÀI ĐẶT VÀ CHẠY VNC ---
+    - name: 🚀 Cài đặt và chạy VNC (noVNC + Cloudflared)
+      shell: pwsh
+      run: |
         try {
           Write-Host "📥 Installing TightVNC..."
           Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.63/tightvnc-2.8.63-gpl-setup-64bit.msi" -OutFile "tightvnc-setup.msi" -TimeoutSec 60
           Write-Host "✅ TightVNC downloaded"
           
-          Start-Process msiexec.exe -Wait -ArgumentList '/i tightvnc-setup.msi /quiet /norestart ADDLOCAL="Server" SERVER_REGISTER_AS_SERVICE=1 SERVER_ADD_FIREWALL_EXCEPTION=1 SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 SET_PASSWORD=1 VALUE_OF_PASSWORD=hieudz SET_ACCEPTHTTPCONNECTIONS=1 VALUE_OF_ACCEPTHTTPCONNECTIONS=1 SET_ALLOWLOOPBACK=1 VALUE_OF_ALLOWLOOPBACK=1'
-          Write-Host "✅ TightVNC installed"
+          Start-Process msiexec.exe -Wait -ArgumentList '/i tightvnc-setup.msi /quiet /norestart ADDLOCAL="Server" SERVER_REGISTER_AS_SERVICE=1 SERVER_ADD_FIREWALL_EXCEPTION=1 SET_USEVNCAUTHENTICATION=1 VALUE_OF_USEVNCAUTHENTICATION=1 SET_PASSWORD=1 VALUE_OF_PASSWORD=thien SET_ACCEPTHTTPCONNECTIONS=1 VALUE_OF_ACCEPTHTTPCONNECTIONS=1 SET_ALLOWLOOPBACK=1 VALUE_OF_ALLOWLOOPBACK=1'
+          Write-Host "✅ TightVNC installed with password."
           
           Write-Host "🔧 Enabling loopback connections in TightVNC registry..."
           Set-ItemProperty -Path "HKLM:\SOFTWARE\TightVNC\Server" -Name "AllowLoopback" -Value 1 -ErrorAction SilentlyContinue
@@ -364,7 +433,7 @@ jobs:
         }
         
         Write-Host "🚀 VPS Session Started - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-        Write-Host "🌌 Access noVNC via remote-link.txt URL (Password: hieudz)"
+        Write-Host "🌌 Access noVNC via remote-link.txt URL (Password: thien)"
         
         mkdir -Force ".backup"
         
@@ -391,7 +460,7 @@ jobs:
             
             if ($filesToBackup.Count -gt 0) {
               try {
-                $backupName = "vps-project-1762601674166_$(Get-Date -Format 'yyyyMMdd_HHmm').zip"
+                $backupName = "vps-project-1759814306940_$(Get-Date -Format 'yyyyMMdd_HHmm').zip"
                 Compress-Archive -Path $filesToBackup -DestinationPath ".backup/$backupName" -Force
                 Write-Host "✅ Backup created: $backupName"
                 
@@ -412,12 +481,8 @@ jobs:
         }
         
         Write-Host "⏰ VPS session completed. Preparing restart..."
-
-    - name: 🔄 Auto Restart Workflow
-      if: always()
-      run: |
-        $lockFile = "restart.lock"
-        $currentTime = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+        
+        $lockFile = ".github/workflows/RESTART.lock"
         
         "RESTART_$(Get-Date -Format 'yyyyMMdd_HHmmss')" | Out-File -FilePath $lockFile -Encoding UTF8
         
@@ -436,9 +501,9 @@ jobs:
         try {
           $headers = @{ "Accept" = "application/vnd.github+json"; "Authorization" = "Bearer $env:GITHUB_TOKEN_VPS"; "Content-Type" = "application/json"; "X-GitHub-Api-Version" = "2022-11-28" }
           
-          $payload = @{ event_type = "create-vps"; client_payload = @{ vps_name = "vps-project-1762601674166"; restart_time = $currentTime; auto_restart = $true } } | ConvertTo-Json -Depth 2
+          $payload = @{ event_type = "create-vps"; client_payload = @{ vps_name = "vps-project-1759814306940"; restart_time = $currentTime; auto_restart = $true } } | ConvertTo-Json -Depth 2
           
-          Invoke-RestMethod -Uri "https://api.github.com/repos/germainepressleycxtry-lab/vps-project-1762601674166/dispatches" -Method Post -Headers $headers -Body $payload -TimeoutSec 30
+          Invoke-RestMethod -Uri "https://api.github.com/repos/chrystalpinckneylr41x-bot/vps-project-1759814306940/dispatches" -Method Post -Headers $headers -Body $payload -TimeoutSec 30
           Write-Host "✅ Workflow restart triggered"
           
           git add $lockFile
